@@ -17,6 +17,7 @@ import com.genersoft.iot.vmp.utils.MediaServerUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,6 +48,9 @@ public class ZLMHttpHookListener {
 
     @Autowired
     private ApplicationEventPublisher applicationEventPublisher;
+
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
 
 
     /**
@@ -295,6 +299,8 @@ public class ZLMHttpHookListener {
         try {
             MediaServer mediaServerItem = mediaServerService.getOne(param.getMediaServerId());
             if (mediaServerItem != null) {
+                // 录像完成事件，用于通知录像完成，用户可以在此事件触发时，立即去查询录像文件；此事件对回复不敏感。
+                redisTemplate.opsForValue().set("on_record_mp4:" + param.getStream(), param);
                 MediaRecordMp4Event event = MediaRecordMp4Event.getInstance(this, param, mediaServerItem);
                 event.setMediaServer(mediaServerItem);
                 applicationEventPublisher.publishEvent(event);
