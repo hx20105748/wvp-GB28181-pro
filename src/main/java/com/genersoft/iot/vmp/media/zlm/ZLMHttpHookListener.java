@@ -2,6 +2,8 @@ package com.genersoft.iot.vmp.media.zlm;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.genersoft.iot.vmp.conf.MediaConfig;
 import com.genersoft.iot.vmp.conf.UserSetting;
 import com.genersoft.iot.vmp.media.bean.MediaServer;
 import com.genersoft.iot.vmp.media.bean.ResultForOnPublish;
@@ -16,16 +18,27 @@ import com.genersoft.iot.vmp.service.IMediaService;
 import com.genersoft.iot.vmp.utils.MediaServerUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpClient.Version;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @description:针对 ZLMediaServer的hook事件监听
@@ -52,6 +65,8 @@ public class ZLMHttpHookListener {
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
 
+    @Autowired
+    private MediaConfig mediaConfig;
 
     /**
      * 服务器定时上报时间，上报间隔可配置，默认10s上报一次
@@ -301,6 +316,8 @@ public class ZLMHttpHookListener {
             if (mediaServerItem != null) {
                 // 录像完成事件，用于通知录像完成，用户可以在此事件触发时，立即去查询录像文件；此事件对回复不敏感。
                 redisTemplate.opsForValue().set("on_record_mp4:" + param.getStream(), param);
+                asyncPostRequest(param);
+
                 MediaRecordMp4Event event = MediaRecordMp4Event.getInstance(this, param, mediaServerItem);
                 event.setMediaServer(mediaServerItem);
                 applicationEventPublisher.publishEvent(event);
@@ -310,5 +327,68 @@ public class ZLMHttpHookListener {
         }
 
         return HookResult.SUCCESS();
+    }
+
+    public CompletableFuture<String> asyncPostRequest(OnRecordMp4HookParam param) {
+        return CompletableFuture.supplyAsync(() -> {
+            String response = "";
+            try {
+                log.info("[asyncPostRequest] 开始发送 POST 请求，参数: {}", param);
+
+                // 查询IP
+                MediaServer mediaSerItemInConfig = mediaConfig.getMediaSerItem();
+                String hookIp = mediaSerItemInConfig.getHookIp();
+                // 创建连接
+                URL url = new URL("http://" + hookIp +"/api/media/api/v1/video-files/addVideo"); // 替换为实际的 URL
+
+                log.info("[asyncPostRequest] 开始发送 POST 请求，URL: {}", url);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("POST");
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", "application/json");
+
+                // 写入请求体
+                String jsonInputString = convertToJson(param);
+                connection.getOutputStream().write(jsonInputString.getBytes("UTF-8"));
+                log.info("[asyncPostRequest] 请求体: {}", jsonInputString);
+                // 获取响应
+                int statusCode = connection.getResponseCode();
+                log.info("[asyncPostRequest] 收到响应状态码: {}", statusCode);
+
+                if (statusCode == HttpURLConnection.HTTP_OK) {
+                    response = readResponse(connection);
+                    log.info("[asyncPostRequest] 请求成功，响应: {}", response);
+                } else {
+                    log.warn("[asyncPostRequest] 请求失败，状态码: {}", statusCode);
+                }
+            } catch (Exception e) {
+                log.error("[asyncPostRequest] 发送请求失败，参数: {}, 异常信息: {}", param, e.getMessage(), e);
+            }
+            return response;
+        });
+    }
+
+    private String convertToJson(OnRecordMp4HookParam param) {
+        // 使用 ObjectMapper 进行 JSON 序列化
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            return objectMapper.writeValueAsString(param);
+        } catch (Exception e) {
+            log.error("JSON 序列化失败: {}", e.getMessage(), e);
+            return "{}";
+        }
+    }
+
+    private String readResponse(HttpURLConnection connection) {
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), "utf-8"))) {
+            String responseLine = null;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        } catch (Exception e) {
+            log.error("读取响应失败: {}", e.getMessage(), e);
+        }
+        return response.toString();
     }
 }

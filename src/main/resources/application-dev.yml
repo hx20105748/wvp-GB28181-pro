@@ -15,13 +15,13 @@ spring:
   # REDIS数据库配置
   redis:
     # [必须修改] Redis服务器IP, REDIS安装在本机的,使用127.0.0.1
-    host: 127.0.0.1
+    host: 221.238.217.219
     # [必须修改] 端口号
     port: 6379
     # [可选] 数据库 DB
     database: 7
     # [可选] 访问密码,若你的redis服务器没有设置密码，就不需要用密码去连接
-    password: luna
+    password: Admin@2025
     # [可选] 超时时间
     timeout: 10000
     # mysql数据源
@@ -32,9 +32,9 @@ spring:
         master:
           type: com.zaxxer.hikari.HikariDataSource
           driver-class-name: com.mysql.cj.jdbc.Driver
-          url: jdbc:mysql://127.0.0.1:3306/wvp2?useUnicode=true&characterEncoding=UTF8&rewriteBatchedStatements=true&serverTimezone=PRC&useSSL=false&allowMultiQueries=true
+          url: jdbc:mysql://221.238.217.219/wvp2?useUnicode=true&characterEncoding=UTF8&rewriteBatchedStatements=true&serverTimezone=PRC&useSSL=false&allowMultiQueries=true
           username: root
-          password: root123
+          password: Admin@2025
           hikari:
             connection-timeout: 20000             # 是客户端等待连接池连接的最大毫秒数
             initialSize: 50                       # 连接池初始化连接数
@@ -76,11 +76,11 @@ sip:
 media:
   id: zlmediakit-local
   # [必须修改] zlm服务器的内网IP
-  ip: 192.168.1.10
+  ip: 192.168.253.159
   # [必须修改] zlm服务器的http.port
   http-port: 9092
   # [必选选] zlm服务器的hook.admin_params=secret
-  secret: TWSYFgYJOQWB4ftgeYut8DW4wbs7pQnj
+  secret: 31d2a594-4ec6-493b-94d6-e54157c07730
   # 启用多端口模式, 多端口模式使用端口区分每路流，兼容性更好。 单端口使用流的ssrc区分， 点播超时建议使用多端口测试
   rtp:
     # [可选] 是否启用多端口模式, 开启后会在portRange范围内选择端口用于媒体流传输
